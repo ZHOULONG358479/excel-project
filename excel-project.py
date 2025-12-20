@@ -52,3 +52,4 @@ title_cell.value = new_title
 # 6. 保存
 wb.save(excel_path)
 print("表头更改已完成")
+print("学习记录：完成 GitHub 基本使用与回滚")
