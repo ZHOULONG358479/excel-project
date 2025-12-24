@@ -1,0 +1,15 @@
+# === Python ===
+__pycache__/
+*.pyc
+
+# === Virtual Environments ===
+.venv/
+env/
+
+# === IDE ===
+.idea/
+.vscode/
+
+# === macOS ===
+.DS_Store
+
