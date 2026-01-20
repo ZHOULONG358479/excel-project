@@ -44,17 +44,18 @@ else:
 
 wb = load_workbook(excel_file, read_only=True)
 ws = wb.active
-chart_title = ws['A1'].value  # 第1行第1列，第1行是五列合并
+chart_title = ws['A1'].value  # 第1行第1列，第1行是七列合并
 print(f"甘特图标题：{chart_title}")
 
 df = pd.read_excel(excel_file, header=1)
-df = df[['井号', '施工工序', '开始日期', '结束日期', '时长（天）', '施工队伍']]  # 新增施工队伍列
+df = df[['业务类型', '井号', '施工队伍', '施工工序', '开始日期', '结束日期', '时长（天）']]  # 新增施工队伍列
+df["业务类型"] = df["业务类型"].ffill()
+df["井号"] = df["井号"].ffill()
+df["施工队伍"] = df["施工队伍"].ffill()
 df['开始日期'] = pd.to_datetime(df['开始日期']).dt.date
 df['结束日期'] = pd.to_datetime(df['结束日期']).dt.date
 df['时长（天）'] = (pd.to_datetime(df['结束日期']) - pd.to_datetime(df['开始日期'])).dt.days + 1
 df = df.reset_index(drop=True)
-print(df)
-
 # -----------------------------
 # 2️⃣ 工序颜色函数
 # -----------------------------
@@ -71,7 +72,6 @@ def get_process_color(process_name: str) -> str:
 # -----------------------------
 井列表 = df['井号'].dropna().unique()
 pdf_path = excel_file.with_name(f"{excel_file.stem}.pdf")
-
 with PdfPages(pdf_path) as pdf:
     for 井 in 井列表:
         df_井 = df[df['井号'] == 井].copy()
@@ -174,8 +174,8 @@ with PdfPages(pdf_path) as pdf:
         # -----------------------------
         # 标题 + 副标题（施工队伍）
         # -----------------------------
-        队伍名称 = df_井['施工队伍'].iloc[0] if '施工队伍' in df_井.columns else ""
-        ax.set_title(f"{chart_title}\n施工队伍：{队伍名称}", fontsize=16, fontweight='bold', color='red')
+        业务类型 = df_井['业务类型'].iloc[0] if '业务类型' in df_井.columns else ""
+        ax.set_title(f"{chart_title}\n业务类型：{业务类型} ", fontsize=16, fontweight='bold', color='red')
         plt.subplots_adjust(left=0.25)
         plt.tight_layout()
 
