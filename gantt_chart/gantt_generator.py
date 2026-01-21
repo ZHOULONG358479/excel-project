@@ -70,15 +70,18 @@ def get_process_color(process_name: str) -> str:
 # -----------------------------
 # 3️⃣ 多井循环绘图，保存到同一 PDF + 单口井 PNG
 # -----------------------------
-井列表 = df['井号'].dropna().unique()
+#井列表 = df['井号'].dropna().unique()
+业务列表 = df['业务类型'].dropna().unique()
+
 pdf_path = excel_file.with_name(f"{excel_file.stem}.pdf")
 with PdfPages(pdf_path) as pdf:
-    for 井 in 井列表:
-        df_井 = df[df['井号'] == 井].copy()
-        start_dates = [datetime.combine(d, datetime.min.time()) for d in df_井['开始日期']]
-        durations = df_井['时长（天）']
+    for 业务 in 业务列表:
+        df_业务 = df[df['业务类型'] == 业务].copy()
+        grouped_by_well = df_业务.groupby("井号", sort=False)
+        start_dates = [datetime.combine(d, datetime.min.time()) for d in df_业务['开始日期']]
+        durations = df_业务['时长（天）']
 
-        fig, ax = plt.subplots(figsize=(12, max(6, len(df_井)*0.5)))
+        fig, ax = plt.subplots(figsize=(12, max(6, len(df_业务)*0.5)))
 
         def format_text_by_days(text, days):
             if days >= 6:
@@ -88,56 +91,76 @@ with PdfPages(pdf_path) as pdf:
             else:
                 return text, 9
 
-        # 绘制条形及文字（短工期智能避让）
-        for i, (start, dur, proc) in enumerate(zip(start_dates, durations, df_井['施工工序'])):
-            color = get_process_color(proc)
 
-            # 画条形
-            ax.barh(
-                y=i,
-                width=dur,
-                left=start,
-                height=0.5,
-                color=color,
-                edgecolor='black'
+        y_base = 0  # 当前 y 轴画到哪一行
+        y_ticks = []  # y 轴刻度位置
+        y_labels = []  # y 轴刻度文字
+
+        # 按井号分组后的循环
+        for 井号, df_井 in df_业务.groupby("井号", sort=False):
+
+            井开始_y = y_base  # 记录这一口井的起始 y
+
+            for _, row in df_井.iterrows():
+                start = datetime.combine(row["开始日期"], datetime.min.time())
+                dur = row["时长（天）"]
+                proc = row["施工工序"]
+
+                color = get_process_color(proc)
+
+                # 画甘特条
+                ax.barh(
+                    y=y_base,
+                    width=dur,
+                    left=start,
+                    height=0.5,
+                    color=color,
+                    edgecolor="black"
+                )
+
+                # 写工序文字（沿用你原来的逻辑）
+                text_str, font_size = format_text_by_days(proc, dur)
+                start_num = mdates.date2num(start)
+                center_x = start_num + dur / 2
+                right_x = start_num + dur + 0.2
+
+                if dur == 1:
+                    ax.text(right_x, y_base, proc,
+                            ha='left', va='center', fontsize=9)
+                else:
+                    ax.text(center_x, y_base, text_str,
+                            ha='center', va='center', fontsize=font_size)
+
+                y_ticks.append(y_base)
+                y_labels.append(proc)
+
+                y_base += 1  # 下一道工序占用下一行
+
+            # —— 井与井之间留一行空白 ——
+            y_base += 1
+
+            # —— 在井分区中间标注井号 ——
+            井中间_y = (井开始_y + y_base - 1) / 2
+            ax.text(
+                mdates.date2num(min(start_dates)) - 0.5,
+                井中间_y,
+                井号,
+                ha="right",
+                va="center",
+                fontsize=11,
+                fontweight="bold"
             )
 
-            text_str, font_size = format_text_by_days(proc, dur)
-            start_num = mdates.date2num(start)
-            center_x = start_num + dur / 2
-            right_x = start_num + dur + 0.2
-            if dur == 1:
-                ax.text(
-                    right_x,
-                    i,
-                    proc,
-                    ha='left',
-                    va='center',
-                    fontsize=9,
-                    color='black'
-                )
-            else:
-                ax.text(
-                    center_x,
-                    i,
-                    text_str,
-                    ha='center',
-                    va='center',
-                    fontsize=font_size,
-                    color='black',
-                    wrap=True
-                )
-
         # 设置纵轴
-        ax.set_yticks(range(len(df_井)))
-        ax.set_yticklabels(df_井['施工工序'])
+        ax.set_yticks(y_ticks)
+        ax.set_yticklabels(y_labels)
         ax.invert_yaxis()
 
         # 纵轴“工序”标签改为“XX井工序”
         ax.text(
             x=-0.05,
             y=1-0.02,
-            s=f"{井}工序",
+            s=f"{业务}工序",
             fontsize=12,
             fontweight='bold',
             rotation=0,
@@ -174,19 +197,12 @@ with PdfPages(pdf_path) as pdf:
         # -----------------------------
         # 标题 + 副标题（施工队伍）
         # -----------------------------
-        业务类型 = df_井['业务类型'].iloc[0] if '业务类型' in df_井.columns else ""
+        业务类型 = df_业务['业务类型'].iloc[0]
         ax.set_title(f"{chart_title}\n业务类型：{业务类型} ", fontsize=16, fontweight='bold', color='red')
         plt.subplots_adjust(left=0.25)
         plt.tight_layout()
 
         # 保存 PDF
         pdf.savefig(fig)
-
-        # 单口井 PNG 保存
-        png_path = excel_file.with_name(f"{excel_file.stem}_{井}.png")
-        plt.savefig(png_path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-
-        print(f"{井}甘特图已保存为 PNG：{png_path}")
 
 print(f"所有井甘特图已保存到 PDF：{pdf_path}")
