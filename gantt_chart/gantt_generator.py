@@ -139,16 +139,16 @@ with PdfPages(pdf_path) as pdf:
             # —— 井与井之间留一行空白 ——
             y_base += 1
 
-            # —— 在井分区中间标注井号 ——
-            井中间_y = (井开始_y + y_base - 1) / 2
+            # —— 在该井所有工序的最上方标注井号 ——
             ax.text(
                 mdates.date2num(min(start_dates)) - 0.5,
-                井中间_y,
+                井开始_y - 0.5,
                 井号,
                 ha="right",
-                va="center",
-                fontsize=11,
-                fontweight="bold"
+                va="bottom",
+                fontsize=14,  # 字号调大（原来是 11）
+                fontweight="bold",  # 加粗
+                color="red"  # 红色字体
             )
 
         # 设置纵轴
@@ -156,18 +156,7 @@ with PdfPages(pdf_path) as pdf:
         ax.set_yticklabels(y_labels)
         ax.invert_yaxis()
 
-        # 纵轴“工序”标签改为“XX井工序”
-        ax.text(
-            x=-0.05,
-            y=1-0.02,
-            s=f"{业务}工序",
-            fontsize=12,
-            fontweight='bold',
-            rotation=0,
-            va='bottom',
-            ha='center',
-            transform=ax.transAxes
-        )
+
 
         # 横轴自动日期刻度
         min_date = min(start_dates)
@@ -176,14 +165,14 @@ with PdfPages(pdf_path) as pdf:
 
         if date_span <= 30:
             locator = mdates.DayLocator(interval=1)
-        elif date_span <= 50:
+        elif date_span <= 60:
             locator = mdates.DayLocator(interval=2)
         elif date_span <= 200:
-            locator = mdates.WeekdayLocator(interval=1)
+            locator = mdates.DayLocator(interval=5)
         elif date_span <= 365:
-            locator = mdates.MonthLocator(interval=1)
+            locator = mdates.WeekdayLocator(interval=1)
         else:
-            locator = mdates.MonthLocator(interval=3)
+            locator = mdates.WeekdayLocator(interval=2)
 
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
