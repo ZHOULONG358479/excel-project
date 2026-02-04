@@ -204,20 +204,20 @@ def draw_well_zones(ax, well_spans):
         )
 
 # -----------------------------
-# 7️⃣ 多业务循环绘图，输出同一 PDF
+# 7️⃣ 多施工队伍循环绘图，输出同一 PDF
 # -----------------------------
-业务列表 = df["业务类型"].dropna().unique()
+队伍列表 = df["施工队伍"].dropna().unique()
 pdf_path = excel_file.with_name(f"{excel_file.stem}.pdf")
 
 with PdfPages(pdf_path) as pdf:
-    for 业务 in 业务列表:
-        df_业务 = df[df["业务类型"] == 业务].copy()
+    for 队伍 in 队伍列表:
+        df_队伍 = df[df["施工队伍"] == 队伍].copy()
 
-        min_date = pd.to_datetime(df_业务["开始日期"]).min().normalize()
-        max_date = pd.to_datetime(df_业务["结束日期"]).max().normalize() + pd.Timedelta(days=1)
+        min_date = pd.to_datetime(df_队伍["开始日期"]).min().normalize()
+        max_date = pd.to_datetime(df_队伍["结束日期"]).max().normalize() + pd.Timedelta(days=1)
         date_span = (max_date - min_date).days
 
-        fig, ax = plt.subplots(figsize=(14, max(6, len(df_业务) * 0.55)))
+        fig, ax = plt.subplots(figsize=(14, max(6, len(df_队伍) * 0.55)))
 
         def format_text_by_days(text, days):
             # 工序名+日期更长，换行适当放宽
@@ -236,7 +236,7 @@ with PdfPages(pdf_path) as pdf:
         well_spans = []         # ✅ 井号分区淡红底块范围：[(y_start, y_end), ...]
 
         # ---- 先跑数据，记录每口井的行范围 + 画条形 ----
-        for 井号, df_井 in df_业务.groupby("井号", sort=False):
+        for 井号, df_井 in df_队伍.groupby("井号", sort=False):
             y_start = y_base        # 该井第一行工序
             井开始_y = y_base
 
@@ -331,7 +331,7 @@ with PdfPages(pdf_path) as pdf:
         ax.set_xlabel("日期", fontsize=12)
 
         # 标题
-        ax.set_title(f"{chart_title}\n业务类型：{业务}", fontsize=16, fontweight="bold", color="red")
+        ax.set_title(f"{chart_title}\n施工队伍：{队伍}", fontsize=16, fontweight="bold", color="red")
 
         plt.subplots_adjust(left=0.25)
         plt.tight_layout()
