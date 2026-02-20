@@ -1,4 +1,5 @@
 from matplotlib import font_manager, rcParams
+from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 from openpyxl import load_workbook
@@ -207,7 +208,8 @@ def draw_well_zones(ax, well_spans):
 # 7️⃣ 多施工队伍循环绘图，输出同一 PDF
 # -----------------------------
 队伍列表 = df["施工队伍"].dropna().unique()
-pdf_path = excel_file.with_name(f"{excel_file.stem}.pdf")
+today_str = datetime.now().strftime("%Y-%m-%d")
+pdf_path = excel_file.with_name(f"{excel_file.stem}_{today_str}.pdf")
 
 with PdfPages(pdf_path) as pdf:
     for 队伍 in 队伍列表:
