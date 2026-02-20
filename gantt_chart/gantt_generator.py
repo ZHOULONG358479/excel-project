@@ -437,18 +437,11 @@ with PdfPages(pdf_path) as pdf:
             pad=10,
         )
 
-        # 页脚：项目名 + 生成日期 + 页码
+        # 页脚：项目名 + 页码
         fig.text(
             0.01, 0.015,
             f"项目：{main_title}",
             ha="left", va="bottom",
-            fontsize=TYPOGRAPHY["footer"],
-            color=THEME["footer_color"],
-        )
-        fig.text(
-            0.5, 0.015,
-            f"生成日期：{today_str}",
-            ha="center", va="bottom",
             fontsize=TYPOGRAPHY["footer"],
             color=THEME["footer_color"],
         )
