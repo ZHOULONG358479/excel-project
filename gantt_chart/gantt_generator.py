@@ -1,5 +1,6 @@
 from matplotlib import font_manager, rcParams
 from datetime import datetime
+import hashlib
 import pandas as pd
 import matplotlib.pyplot as plt
 from openpyxl import load_workbook
@@ -22,6 +23,45 @@ for font in chinese_fonts:
 else:
     raise RuntimeError("系统中未找到可用的中文字体")
 rcParams["axes.unicode_minus"] = False
+
+# -----------------------------
+# 主题样式（工程汇报风格）
+# -----------------------------
+PROCESS_COLOR_PALETTE = [
+    "#1F4E79",  # 深蓝
+    "#2F6B9A",  # 中深蓝
+    "#4A89B2",  # 中蓝
+    "#78A9CC",  # 浅蓝
+]
+
+THEME = {
+    "figure_bg": "#FFFFFF",
+    "axes_bg": "#FFFFFF",
+    "stripe_bg": "#FAFBFC",
+    "vline_color": "#E3E7EC",
+    "hline_color": "#EAEEF2",
+    "group_line_color": "#C3CCD6",
+    "well_zone_color": "#F4F7FA",
+    "bar_edge": "#2F3E4D",
+    "label_bbox": "#FFFFFF",
+    "title_color": "#1F2F3F",
+    "well_label_color": "#35516D",
+    "axis_text_color": "#4A5D70",
+    "spine_color": "#D2DAE3",
+    "leader_line_color": "#8DA0B3",
+    "footer_color": "#5D6F82",
+}
+
+TYPOGRAPHY = {
+    "title_main": 18,
+    "title_sub": 12,
+    "axis_label": 11,
+    "tick_label": 10,
+    "well_label": 13,
+    "bar_label": 8,
+    "bar_label_large": 9,
+    "footer": 9,
+}
 
 # -----------------------------
 # 1️⃣ 找到桌面 Excel 文件
@@ -69,12 +109,14 @@ df = df.reset_index(drop=True)
 # 3️⃣ 工序颜色函数
 # -----------------------------
 def get_process_color(process_name: str) -> str:
-    if any(k in process_name for k in ["立井架", "搬迁", "上井", "施工准备", "设备安装", "就位", "压前准备", "开工验收"]):
-        return "#4CAF50"  # 准备类
-    elif any(k in process_name for k in ["打包", "放井架", "归拢", "撤场", "交井", "拆解", "收尾"]):
-        return "#FF9800"  # 收尾类
-    else:
-        return "#2196F3"  # 施工类
+    """
+    按工序名称稳定映射到调色盘，不再按“准备/施工/收尾”分类。
+    这样视觉更统一，也能保证同名工序跨页面颜色一致。
+    """
+    key = (process_name or "").strip() or "default"
+    digest = hashlib.md5(key.encode("utf-8")).hexdigest()
+    color_idx = int(digest[:8], 16) % len(PROCESS_COLOR_PALETTE)
+    return PROCESS_COLOR_PALETTE[color_idx]
 
 # -----------------------------
 # 4️⃣ 工程级时间引擎
@@ -146,23 +188,23 @@ def set_excel_2d_grid(ax, min_date: pd.Timestamp, max_date: pd.Timestamp, date_s
         if i % 2 == 0:
             left = mdates.date2num(edges[i].to_pydatetime())
             right = mdates.date2num(edges[i + 1].to_pydatetime())
-            ax.axvspan(left, right, facecolor="#f7f7f7", alpha=1.0, zorder=0)
+            ax.axvspan(left, right, facecolor=THEME["stripe_bg"], alpha=1.0, zorder=0)
 
     # 5) 画竖线边框（实线）
     y_min = -1
     y_max = max(2, y_total)
     for x in edges_num:
-        ax.vlines(x, ymin=y_min, ymax=y_max, colors="#bfbfbf", linewidth=0.8, zorder=1)
+        ax.vlines(x, ymin=y_min, ymax=y_max, colors=THEME["vline_color"], linewidth=0.8, zorder=1)
 
     # 6) 画横线边框（实线）——二维表格
     x_left = mdates.date2num(min_date.to_pydatetime())
     x_right = mdates.date2num(max_date.to_pydatetime())
     y_lines = np.arange(-0.5, y_total + 0.5, 1.0)
-    ax.hlines(y_lines, xmin=x_left, xmax=x_right, colors="#d0d0d0", linewidth=0.6, zorder=1)
+    ax.hlines(y_lines, xmin=x_left, xmax=x_right, colors=THEME["hline_color"], linewidth=0.6, zorder=1)
 
     # 7) 分组粗线
     for y_sep in group_separators:
-        ax.hlines(y_sep, xmin=x_left, xmax=x_right, colors="#9e9e9e", linewidth=1.8, zorder=2)
+        ax.hlines(y_sep, xmin=x_left, xmax=x_right, colors=THEME["group_line_color"], linewidth=1.8, zorder=2)
 
     # 8) 显示范围
     ax.set_xlim(x_left, x_right)
@@ -180,10 +222,18 @@ def apply_top_axis(ax, tick_info):
     ax_top.set_xlim(tick_info["x_left"], tick_info["x_right"])
     ax_top.xaxis.set_major_locator(FixedLocator(tick_info["centers_num"]))
     ax_top.xaxis.set_major_formatter(mdates.DateFormatter(tick_info["fmt"]))
-    ax_top.tick_params(axis="x", labelrotation=45)
+    ax_top.tick_params(
+        axis="x",
+        labelrotation=45,
+        colors=THEME["axis_text_color"],
+        labelsize=TYPOGRAPHY["tick_label"],
+    )
     ax_top.grid(False)
-    ax_top.spines["top"].set_color("#bfbfbf")
+    ax_top.spines["top"].set_color(THEME["spine_color"])
     ax_top.spines["top"].set_linewidth(0.8)
+    ax_top.spines["bottom"].set_visible(False)
+    ax_top.spines["left"].set_visible(False)
+    ax_top.spines["right"].set_visible(False)
     return ax_top
 
 # -----------------------------
@@ -199,8 +249,8 @@ def draw_well_zones(ax, well_spans):
             ys - 0.5,
             ye - 0.5,
             xmin=0, xmax=1,
-            facecolor="#ffe5e5",  # 淡红
-            alpha=0.45,
+            facecolor=THEME["well_zone_color"],  # 井区浅色底块
+            alpha=0.55,
             zorder=0.4            # 在灰底纹之上，在网格线/条形之下
         )
 
@@ -210,25 +260,39 @@ def draw_well_zones(ax, well_spans):
 队伍列表 = df["施工队伍"].dropna().unique()
 today_str = datetime.now().strftime("%Y-%m-%d")
 pdf_path = excel_file.with_name(f"{excel_file.stem}_{today_str}.pdf")
+main_title = str(chart_title).strip() if chart_title else "施工进度图"
+page_total = len(队伍列表)
 
 with PdfPages(pdf_path) as pdf:
-    for 队伍 in 队伍列表:
+    metadata = pdf.infodict()
+    metadata["Title"] = f"{main_title} 甘特图"
+    metadata["Author"] = "Gantt Generator"
+    metadata["Subject"] = "工程施工进度计划"
+    metadata["Creator"] = "gantt_chart/gantt_generator.py"
+    metadata["CreationDate"] = datetime.now()
+    metadata["ModDate"] = datetime.now()
+
+    for page_idx, 队伍 in enumerate(队伍列表, start=1):
         df_队伍 = df[df["施工队伍"] == 队伍].copy()
 
         min_date = pd.to_datetime(df_队伍["开始日期"]).min().normalize()
         max_date = pd.to_datetime(df_队伍["结束日期"]).max().normalize() + pd.Timedelta(days=1)
         date_span = (max_date - min_date).days
 
-        fig, ax = plt.subplots(figsize=(14, max(6, len(df_队伍) * 0.55)))
+        fig, ax = plt.subplots(
+            figsize=(11.69, 8.27),  # A4 横版固定版式
+            facecolor=THEME["figure_bg"]
+        )
+        ax.set_facecolor(THEME["axes_bg"])
 
         def format_text_by_days(text, days):
             # 工序名+日期更长，换行适当放宽
             if days >= 6:
-                return text, 9
+                return text, TYPOGRAPHY["bar_label_large"]
             elif days > 1:
-                return "\n".join(textwrap.wrap(text, width=14)), 8
+                return "\n".join(textwrap.wrap(text, width=14)), TYPOGRAPHY["bar_label"]
             else:
-                return "\n".join(textwrap.wrap(text, width=14)), 8
+                return "\n".join(textwrap.wrap(text, width=14)), TYPOGRAPHY["bar_label"]
 
         y_base = 0
         y_ticks = []
@@ -253,7 +317,7 @@ with PdfPages(pdf_path) as pdf:
                 width_days = right_num - left_num
 
                 # 标签：工序 + 日期字段（例：修井车施工准备06.03-06.05）
-                label = f"{proc}{fmt_mmdd_dot(row['开始日期'])}-{fmt_mmdd_dot(row['结束日期'])}"
+                label = f"{proc} | {fmt_mmdd_dot(row['开始日期'])}-{fmt_mmdd_dot(row['结束日期'])}"
 
                 # 条形
                 ax.barh(
@@ -262,7 +326,8 @@ with PdfPages(pdf_path) as pdf:
                     left=left_num,
                     height=0.5,
                     color=color,
-                    edgecolor="black",
+                    edgecolor=THEME["bar_edge"],
+                    linewidth=0.8,
                     zorder=3
                 )
 
@@ -273,14 +338,32 @@ with PdfPages(pdf_path) as pdf:
                 center_x = left_num + width_days / 2
                 right_x = left_num + width_days + 0.2
 
-                if width_days < 0.6:
-                    ax.text(right_x, y_base, label, ha="left", va="center", fontsize=8, zorder=4)
+                if width_days < 1.2:
+                    label_x = right_x + 0.2
+                    ax.annotate(
+                        label,
+                        xy=(right_num, y_base),
+                        xytext=(label_x, y_base),
+                        textcoords="data",
+                        ha="left",
+                        va="center",
+                        fontsize=TYPOGRAPHY["bar_label"],
+                        color=THEME["axis_text_color"],
+                        arrowprops=dict(
+                            arrowstyle="-",
+                            color=THEME["leader_line_color"],
+                            lw=0.8,
+                            shrinkA=0,
+                            shrinkB=0,
+                        ),
+                        zorder=4,
+                    )
                 else:
                     ax.text(
                         center_x, y_base, text_str,
                         ha="center", va="center",
-                        fontsize=font_size,
-                        bbox=dict(facecolor="white", alpha=0.6, edgecolor="none"),
+                        fontsize=font_size, color="#1F2D3D",
+                        bbox=dict(facecolor=THEME["label_bbox"], alpha=0.65, edgecolor="none"),
                         zorder=4
                     )
 
@@ -304,9 +387,9 @@ with PdfPages(pdf_path) as pdf:
                 str(井号),
                 ha="right",
                 va="bottom",
-                fontsize=14,
+                fontsize=TYPOGRAPHY["well_label"],
                 fontweight="bold",
-                color="red",
+                color=THEME["well_label_color"],
                 zorder=6
             )
 
@@ -327,16 +410,58 @@ with PdfPages(pdf_path) as pdf:
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
         ax.invert_yaxis()
+        ax.tick_params(axis="x", colors=THEME["axis_text_color"], labelsize=TYPOGRAPHY["tick_label"])
+        ax.tick_params(axis="y", colors=THEME["axis_text_color"], labelsize=TYPOGRAPHY["tick_label"])
+        for spine in ax.spines.values():
+            spine.set_color(THEME["spine_color"])
+            spine.set_linewidth(0.9)
 
         # 其他外观
         fig.autofmt_xdate(rotation=45)
-        ax.set_xlabel("日期", fontsize=12)
+        ax.set_xlabel("日期", fontsize=TYPOGRAPHY["axis_label"], color=THEME["axis_text_color"])
 
-        # 标题
-        ax.set_title(f"{chart_title}\n施工队伍：{队伍}", fontsize=16, fontweight="bold", color="red")
+        # 标题层级：主标题（工程名）+ 副标题（施工队伍）
+        subtitle = f"施工队伍：{队伍}"
+        fig.suptitle(
+            main_title,
+            fontsize=TYPOGRAPHY["title_main"],
+            fontweight="bold",
+            color=THEME["title_color"],
+            y=0.98,
+        )
+        ax.set_title(
+            subtitle,
+            fontsize=TYPOGRAPHY["title_sub"],
+            fontweight="semibold",
+            color=THEME["axis_text_color"],
+            pad=10,
+        )
 
-        plt.subplots_adjust(left=0.25)
-        plt.tight_layout()
+        # 页脚：项目名 + 生成日期 + 页码
+        fig.text(
+            0.01, 0.015,
+            f"项目：{main_title}",
+            ha="left", va="bottom",
+            fontsize=TYPOGRAPHY["footer"],
+            color=THEME["footer_color"],
+        )
+        fig.text(
+            0.5, 0.015,
+            f"生成日期：{today_str}",
+            ha="center", va="bottom",
+            fontsize=TYPOGRAPHY["footer"],
+            color=THEME["footer_color"],
+        )
+        fig.text(
+            0.99, 0.015,
+            f"第 {page_idx}/{page_total} 页",
+            ha="right", va="bottom",
+            fontsize=TYPOGRAPHY["footer"],
+            color=THEME["footer_color"],
+        )
+
+        fig.tight_layout(rect=(0.0, 0.04, 1.0, 0.92))
+        fig.subplots_adjust(left=0.25)
 
         pdf.savefig(fig)
         plt.close(fig)
